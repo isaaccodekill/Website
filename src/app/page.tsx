@@ -18,9 +18,9 @@ const jsonLd = {
   description:
     "Software engineer transitioning into AI engineering, with experience in TypeScript, Next.js, Python, and machine learning.",
   sameAs: [
-    "https://github.com/belloisaac",
-    "https://twitter.com/belloisaac",
-    "https://linkedin.com/in/belloisaac",
+    "https://github.com/isaaccodekill",
+    "https://x.com/iscaa_82",
+    "https://www.linkedin.com/in/isaac-bello/",
   ],
   knowsAbout: [
     "TypeScript",

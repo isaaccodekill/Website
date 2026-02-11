@@ -3,10 +3,10 @@
 import Link from "next/link";
 
 const socialLinks = [
-  { name: "GitHub", href: "https://github.com/your-username" },
-  { name: "Twitter/X", href: "https://x.com/your-username" },
-  { name: "LinkedIn", href: "https://linkedin.com/in/your-username" },
-  { name: "Email", href: "mailto:hello@example.com" },
+  { name: "GitHub", href: "https://github.com/isaaccodekill" },
+  { name: "Twitter/X", href: "https://x.com/iscaa_82" },
+  { name: "LinkedIn", href: "https://www.linkedin.com/in/isaac-bello/" },
+  { name: "Email", href: "mailto:isaacbello3200@gmail.com" },
 ];
 
 export function Footer() {
