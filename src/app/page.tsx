@@ -6,7 +6,7 @@ import { LiquidBlob } from "@/components/effects/LiquidBlob";
 import { Butterflies } from "@/components/effects/Butterflies";
 import { getHomePageSections } from "@/lib/site-content";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://isaacadewumi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
 
 // JSON-LD structured data for SEO
 const jsonLd = {
@@ -18,9 +18,9 @@ const jsonLd = {
   description:
     "Software engineer transitioning into AI engineering, with experience in TypeScript, Next.js, Python, and machine learning.",
   sameAs: [
-    "https://github.com/isaacadewumi",
-    "https://twitter.com/isaacadewumi",
-    "https://linkedin.com/in/isaacadewumi",
+    "https://github.com/belloisaac",
+    "https://twitter.com/belloisaac",
+    "https://linkedin.com/in/belloisaac",
   ],
   knowsAbout: [
     "TypeScript",

@@ -88,7 +88,7 @@ export async function generateMetadata({
     };
   }
 
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://isaacadewumi.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
   const ogImageUrl = `${SITE_URL}/api/og?title=${encodeURIComponent(
     post.frontmatter.title
   )}&subtitle=${encodeURIComponent(`${post.frontmatter.readingTime} min read`)}`;
@@ -137,7 +137,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     },
   });
 
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://isaacadewumi.com";
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
 
   // JSON-LD structured data for SEO
   const jsonLd = {

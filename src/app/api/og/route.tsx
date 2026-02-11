@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             letterSpacing: "0.08em",
           }}
         >
-          isaacadewumi.com
+          belloisaac.com
         </div>
       </div>
     ),

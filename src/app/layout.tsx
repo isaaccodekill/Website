@@ -5,7 +5,7 @@ import { Footer } from "@/components/ui/Footer";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import "./globals.css";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://isaacadewumi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
