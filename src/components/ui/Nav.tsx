@@ -43,11 +43,11 @@ export function Nav() {
         </Link>
 
         {/* Nav Links */}
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <MagneticElement>
             <Link
               href="/"
-              className="font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
+              className="hidden sm:inline font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
             >
               <span className="text-text-tertiary">[H]</span> Home
             </Link>
@@ -58,7 +58,7 @@ export function Nav() {
               href="/blog"
               className="font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
             >
-              <span className="text-text-tertiary">[B]</span> Blog
+              <span className="hidden sm:inline text-text-tertiary">[B]</span> Blog
             </Link>
           </MagneticElement>
 
@@ -67,7 +67,7 @@ export function Nav() {
               href="/media"
               className="font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
             >
-              <span className="text-text-tertiary">[M]</span> Media
+              <span className="hidden sm:inline text-text-tertiary">[M]</span> Media
             </Link>
           </MagneticElement>
 
@@ -78,11 +78,11 @@ export function Nav() {
               rel="noopener noreferrer"
               className="font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
             >
-              <span className="text-text-tertiary">[R]</span> Resume
+              <span className="hidden sm:inline text-text-tertiary">[R]</span> Resume
             </a>
           </MagneticElement>
 
-          <div className="border-l border-border pl-4 sm:pl-6">
+          <div className="border-l border-border pl-3 sm:pl-6">
             <ThemeToggle />
           </div>
         </div>
