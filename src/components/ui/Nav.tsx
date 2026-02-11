@@ -71,6 +71,17 @@ export function Nav() {
             </Link>
           </MagneticElement>
 
+          <MagneticElement>
+            <a
+              href="/Isaac_Bello_Full_Stack_Developer.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[0.6875rem] font-normal tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors duration-300"
+            >
+              <span className="text-text-tertiary">[R]</span> Resume
+            </a>
+          </MagneticElement>
+
           <div className="border-l border-border pl-4 sm:pl-6">
             <ThemeToggle />
           </div>
