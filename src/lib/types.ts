@@ -10,5 +10,6 @@ export interface PostFrontmatter {
 export interface Post {
   frontmatter: PostFrontmatter;
   content: string;
+  document?: unknown;
   slug: string;
 }

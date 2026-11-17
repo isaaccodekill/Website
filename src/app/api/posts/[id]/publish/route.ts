@@ -1,104 +1,82 @@
+import { textOf } from "@/components/journal/RichText";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
+import { studioApiGuard } from "@/lib/studio-auth";
 import { db } from "@/lib/db";
 import { posts } from "@/lib/schema";
 import { eq } from "drizzle-orm";
-import { tiptapToMdx, generateMdxFile } from "@/lib/tiptap-to-mdx";
-import fs from "fs";
-import path from "path";
-
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
-
-// POST /api/posts/[id]/publish - Publish a post to MDX file
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const denied = await studioApiGuard(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
-
-    const rows = await db.select().from(posts).where(eq(posts.id, id));
-
-    if (rows.length === 0) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
-
-    const post = rows[0];
-
-    // Validate required fields
-    if (!post.title || !post.slug) {
+    const body = await request.json();
+    if (body.confirmPublish !== true)
       return NextResponse.json(
-        { error: "Title and slug are required to publish" },
-        { status: 400 }
+        { error: "Please confirm publication." },
+        { status: 400 },
       );
-    }
-
-    // Parse tiptap JSON and convert to MDX
-    let mdxContent = "";
-    if (post.tiptapJson) {
-      try {
-        const tiptapDoc =
-          typeof post.tiptapJson === "string"
-            ? JSON.parse(post.tiptapJson)
-            : post.tiptapJson;
-        mdxContent = tiptapToMdx(tiptapDoc);
-      } catch (e) {
-        console.error("Error parsing tiptap JSON:", e);
-        mdxContent = "";
-      }
-    }
-
-    // Parse topics
-    const topics: string[] = Array.isArray(post.topics)
-      ? (post.topics as string[])
-      : [];
-
-    // Generate MDX file content
-    const mdxFile = generateMdxFile(
-      {
-        title: post.title,
-        slug: post.slug,
-        date:
-          post.publishedAt?.toISOString().split("T")[0] ||
-          new Date().toISOString().split("T")[0],
-        topics,
-        excerpt: post.excerpt || "",
-        readingTime: post.readingTime || 1,
-      },
-      mdxContent
-    );
-
-    // Write to content/posts directory
-    const postsDir = path.join(process.cwd(), "content", "posts");
-
-    // Ensure directory exists
-    if (!fs.existsSync(postsDir)) {
-      fs.mkdirSync(postsDir, { recursive: true });
-    }
-
-    const filePath = path.join(postsDir, `${post.slug}.mdx`);
-    fs.writeFileSync(filePath, mdxFile, "utf8");
-
-    // Update post status in database
-    const now = new Date();
-    const [updated] = await db
+    if (
+      typeof body.title !== "string" ||
+      !body.title.trim() ||
+      typeof body.slug !== "string" ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(body.slug)
+    )
+      return NextResponse.json(
+        {
+          error:
+            "Add a title and a URL containing lowercase letters, numbers and hyphens.",
+        },
+        { status: 400 },
+      );
+    const [existing] = await db.select().from(posts).where(eq(posts.id, id));
+    if (!existing)
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    const doc =
+      typeof body.tiptap_json === "string"
+        ? JSON.parse(body.tiptap_json)
+        : body.tiptap_json;
+    if (doc?.type !== "doc")
+      return NextResponse.json(
+        { error: "Invalid page content" },
+        { status: 400 },
+      );
+    const words = textOf(doc).trim().split(/\s+/).filter(Boolean).length;
+    const [post] = await db
       .update(posts)
       .set({
+        title: body.title.trim(),
+        slug: body.slug,
+        excerpt: body.excerpt || "",
+        topics: body.topics || [],
+        tiptapJson: doc,
         status: "published",
-        publishedAt: post.publishedAt ?? now,
-        updatedAt: now,
+        publishedAt: existing.publishedAt ?? new Date(),
+        updatedAt: new Date(),
+        wordCount: words,
+        readingTime: Math.max(1, Math.ceil(words / 200)),
       })
       .where(eq(posts.id, id))
       .returning();
-
-    return NextResponse.json({
-      success: true,
-      post: updated,
-      filePath: `content/posts/${post.slug}.mdx`,
-    });
-  } catch (error) {
-    console.error("Error publishing post:", error);
+    for (const path of [
+      "/",
+      "/blog",
+      `/blog/${existing.slug}`,
+      `/blog/${post.slug}`,
+      "/feed.xml",
+      "/sitemap.xml",
+    ])
+      revalidatePath(path);
+    return NextResponse.json({ post });
+  } catch {
     return NextResponse.json(
-      { error: "Failed to publish post" },
-      { status: 500 }
+      {
+        error: "Couldn’t publish. Check that the URL is unique and try again.",
+      },
+      { status: 500 },
     );
   }
 }

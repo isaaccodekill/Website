@@ -10,26 +10,26 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Isaac Bello — Software Engineer",
+    default: "Isaac Bello — A personal notebook",
     template: "%s — Isaac Bello",
   },
   description:
-    "Personal portfolio and blog of Isaac Bello, a software engineer transitioning into AI engineering.",
+    "Notes on feelings, questions, and figuring things out. A personal notebook by Isaac Bello.",
   authors: [{ name: "Isaac Bello" }],
   creator: "Isaac Bello",
   openGraph: {
-    title: "Isaac Bello — Software Engineer",
+    title: "Isaac Bello — A personal notebook",
     description:
-      "Personal portfolio and blog of Isaac Bello, a software engineer transitioning into AI engineering.",
+      "Notes on feelings, questions, and figuring things out. A personal notebook by Isaac Bello.",
     type: "website",
     locale: "en_US",
     siteName: "Isaac Bello",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Isaac Bello — Software Engineer",
+    title: "Isaac Bello — A personal notebook",
     description:
-      "Personal portfolio and blog of Isaac Bello, a software engineer transitioning into AI engineering.",
+      "Notes on feelings, questions, and figuring things out. A personal notebook by Isaac Bello.",
   },
   alternates: {
     canonical: SITE_URL,

@@ -1,7 +1,8 @@
+import { studioApiGuard } from "@/lib/studio-auth";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { posts } from "@/lib/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -9,6 +10,9 @@ interface RouteParams {
 
 // GET /api/posts/[id] - Get a single post
 export async function GET(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
 
@@ -23,13 +27,16 @@ export async function GET(request: Request, { params }: RouteParams) {
     console.error("Error fetching post:", error);
     return NextResponse.json(
       { error: "Failed to fetch post" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 // PUT /api/posts/[id] - Update a post
 export async function PUT(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -62,13 +69,23 @@ export async function PUT(request: Request, { params }: RouteParams) {
     if (body.topics !== undefined)
       updateData.topics =
         typeof body.topics === "string" ? JSON.parse(body.topics) : body.topics;
-    if (body.status !== undefined) updateData.status = body.status;
+    const [existing] = await db
+      .select({ status: posts.status })
+      .from(posts)
+      .where(eq(posts.id, id));
+    if (existing?.status === "published")
+      return NextResponse.json(
+        {
+          error: "Use the explicit publish action to update a published piece.",
+        },
+        { status: 409 },
+      );
     if (tiptapContent !== null) updateData.tiptapJson = tiptapContent;
 
     const [updated] = await db
       .update(posts)
       .set(updateData)
-      .where(eq(posts.id, id))
+      .where(and(eq(posts.id, id), eq(posts.status, "draft")))
       .returning();
 
     if (!updated) {
@@ -80,13 +97,16 @@ export async function PUT(request: Request, { params }: RouteParams) {
     console.error("Error updating post:", error);
     return NextResponse.json(
       { error: "Failed to update post" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 // DELETE /api/posts/[id] - Delete a post
 export async function DELETE(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
 
@@ -97,7 +117,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     console.error("Error deleting post:", error);
     return NextResponse.json(
       { error: "Failed to delete post" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

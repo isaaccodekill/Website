@@ -1,70 +1,70 @@
-import { Letterhead } from "@/components/home/Letterhead";
-import { TheLetter } from "@/components/home/TheLetter";
-import { RecentWriting } from "@/components/home/RecentWriting";
-import { Divider } from "@/components/ui/Divider";
-import { LiquidBlob } from "@/components/effects/LiquidBlob";
-import { Butterflies } from "@/components/effects/Butterflies";
-import { getHomePageSections } from "@/lib/site-content";
-
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://belloisaac.com";
-
-// JSON-LD structured data for SEO
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Person",
-  name: "Isaac Bello",
-  url: SITE_URL,
-  jobTitle: "Software Engineer",
-  description:
-    "Software engineer transitioning into AI engineering, with experience in TypeScript, Next.js, Python, and machine learning.",
-  sameAs: [
-    "https://github.com/isaaccodekill",
-    "https://x.com/iscaa_82",
-    "https://www.linkedin.com/in/isaac-bello/",
-  ],
-  knowsAbout: [
-    "TypeScript",
-    "Next.js",
-    "React",
-    "Python",
-    "Machine Learning",
-    "Deep Learning",
-    "Software Engineering",
-    "AI Engineering",
-  ],
-  alumniOf: {
-    "@type": "CollegeOrUniversity",
-    name: "University of Lagos",
-  },
-};
-
+import Link from "next/link";
+import { getAllPosts } from "@/lib/mdx";
+import { Doodle } from "@/components/journal/Doodle";
+import { formatDate } from "@/lib/utils";
+export const dynamic = "force-dynamic";
 export default async function Home() {
-  const sections = await getHomePageSections();
-
+  const posts = await getAllPosts();
   return (
-    <>
-      {/* JSON-LD structured data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-
-      {/* Ambient cursor blob effect (desktop only) */}
-      <LiquidBlob />
-
-      {/* Subtle butterflies floating across screen */}
-      <Butterflies />
-
-      {/* Main content */}
-      <div className="relative z-10 min-h-screen">
-        {/* The Letter */}
-        <div className="mx-auto max-w-[38rem] px-6 pt-36 pb-16">
-          <Letterhead />
-          <TheLetter sections={sections} />
-          <Divider className="mt-16" />
-          <RecentWriting />
+    <div className="journal-shell">
+      <section className="journal-intro">
+        <p className="eyebrow">A personal notebook, open at a few pages</p>
+        <h1>
+          Thinking out loud.
+          <br />
+          <em>Finding my way.</em>
+        </h1>
+        <Doodle />
+        <p className="intro-copy">
+          I’m Isaac. I write to make a little more sense of what I feel, who I
+          am, and the world around me.
+        </p>
+        <p className="margin-note">
+          Still figuring things out. You’re welcome to stay a while.
+        </p>
+      </section>
+      <section className="journal-entries">
+        <div className="section-heading">
+          <h2>Pages I’ve opened</h2>
+          <Link href="/blog">all writing ↗</Link>
         </div>
-      </div>
-    </>
+        {posts.length ? (
+          posts.slice(0, 5).map((post, i) => (
+            <Link
+              className="entry-row"
+              key={post.slug}
+              href={`/blog/${post.slug}`}
+            >
+              <span className="entry-number">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <h3>{post.frontmatter.title}</h3>
+                {post.frontmatter.excerpt && <p>{post.frontmatter.excerpt}</p>}
+                <span className="entry-date">
+                  {formatDate(post.frontmatter.date)} ·{" "}
+                  {post.frontmatter.readingTime} min read
+                </span>
+              </div>
+              <span aria-hidden="true">↗</span>
+            </Link>
+          ))
+        ) : (
+          <p className="empty-note">
+            A few thoughts are taking shape. I’ll share them here when they’re
+            ready.
+          </p>
+        )}
+      </section>
+      <aside className="little-note">
+        <span aria-hidden="true">✳</span>
+        <p>
+          Some things make more sense
+          <br />
+          when you give them a page.
+        </p>
+        <span className="eyebrow">A reminder to myself</span>
+      </aside>
+    </div>
   );
 }

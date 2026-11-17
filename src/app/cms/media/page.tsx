@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/studio-auth";
 import { Metadata } from "next";
 import Link from "next/link";
 import { db } from "@/lib/db";
@@ -81,6 +82,7 @@ async function createNewEntry() {
 }
 
 export default async function MediaCMSPage({ searchParams }: PageProps) {
+  await requireOwner();
   const params = await searchParams;
 
   // Create new entry if requested

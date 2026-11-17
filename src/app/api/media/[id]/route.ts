@@ -1,3 +1,4 @@
+import { studioApiGuard } from "@/lib/studio-auth";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { mediaEntries } from "@/lib/schema";
@@ -10,6 +11,8 @@ interface RouteParams {
 
 // GET /api/media/[id] - Get a single media entry
 export async function GET(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request); if (denied) return denied;
+
   try {
     const { id } = await params;
 
@@ -47,6 +50,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 
 // PUT /api/media/[id] - Update a media entry
 export async function PUT(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request); if (denied) return denied;
+
   try {
     const { id } = await params;
     const body = await request.json();
@@ -98,6 +103,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 // DELETE /api/media/[id] - Delete a media entry
 export async function DELETE(request: Request, { params }: RouteParams) {
+  const denied = await studioApiGuard(request); if (denied) return denied;
+
   try {
     const { id } = await params;
 

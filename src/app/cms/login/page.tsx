@@ -1,33 +1,51 @@
-import { Metadata } from "next";
-import Link from "next/link";
-
-export const metadata: Metadata = {
-  title: "CMS — Writing Studio",
+import { signIn } from "@/auth";
+export const metadata = {
+  title: "Private notebook",
+  robots: { index: false, follow: false },
 };
-
-// Auth disabled for now - just show link to dashboard
-export default function LoginPage() {
+export default async function Login({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const ready = !!(
+    process.env.AUTH_GITHUB_ID &&
+    process.env.AUTH_GITHUB_SECRET &&
+    process.env.AUTH_SECRET
+  );
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
-      <div className="w-full max-w-sm px-6 text-center">
-        <h1 className="font-serif text-3xl font-semibold text-text mb-2">
-          Writing Studio
-        </h1>
-        <p className="font-mono text-xs text-text-secondary uppercase tracking-wider mb-8">
-          / CMS Access
+    <section className="studio-welcome">
+      <span className="notebook-star" aria-hidden="true">
+        ✳
+      </span>
+      <p className="eyebrow">Just for you</p>
+      <h1>Your private notebook.</h1>
+      <p>
+        A place to think before you share. Sign in with your GitHub account to
+        open your drafts.
+      </p>
+      {error && (
+        <p role="alert">
+          Sign-in didn’t complete. This notebook is only open to Isaac’s GitHub
+          account.
         </p>
-
-        <Link
-          href="/cms"
-          className="inline-block w-full px-4 py-3 bg-text text-bg font-mono text-sm uppercase tracking-wider rounded-md hover:bg-text/90 transition-colors duration-200"
+      )}
+      {ready ? (
+        <form
+          action={async () => {
+            "use server";
+            await signIn("github", { redirectTo: "/cms" });
+          }}
         >
-          Enter Dashboard
-        </Link>
-
-        <p className="mt-6 font-mono text-[0.625rem] text-text-tertiary uppercase tracking-wider">
-          Authentication disabled for development
+          <button className="ink-button">Open with GitHub ↗</button>
+        </form>
+      ) : (
+        <p role="status">
+          Sign-in setup is in progress. The notebook stays locked until it is
+          ready.
         </p>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

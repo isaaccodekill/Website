@@ -1,80 +1,71 @@
 "use client";
-
-import { useState, useMemo } from "react";
-import { PostListItem } from "./PostListItem";
-import { TopicFilter } from "./TopicFilter";
-import { FadeInStagger, FadeInStaggerItem } from "@/components/ui/FadeIn";
+import { useState } from "react";
+import Link from "next/link";
 import type { Post } from "@/lib/types";
-
-interface PostListProps {
+import { formatDate } from "@/lib/utils";
+export function PostList({
+  posts,
+  topics,
+}: {
   posts: Post[];
   topics: { name: string; count: number }[];
-}
-
-export function PostList({ posts, topics }: PostListProps) {
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-
-  const filteredPosts = useMemo(() => {
-    if (selectedTopics.length === 0) {
-      return posts;
-    }
-    return posts.filter((post) =>
-      post.frontmatter.topics.some((topic) => selectedTopics.includes(topic))
-    );
-  }, [posts, selectedTopics]);
-
+}) {
+  const [topic, setTopic] = useState("");
+  const [query, setQuery] = useState("");
+  const filtered = posts.filter(
+    (p) =>
+      (!topic || p.frontmatter.topics.includes(topic)) &&
+      `${p.frontmatter.title} ${p.frontmatter.excerpt}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-8">
-      {/* Sidebar filters - hidden on mobile */}
-      <div className="hidden md:block">
-        <TopicFilter
-          topics={topics}
-          selectedTopics={selectedTopics}
-          onTopicChange={setSelectedTopics}
-          totalPosts={posts.length}
+    <section className="archive-list">
+      <label className="search-label">
+        Find a thought
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search these pages…"
         />
-      </div>
-
-      {/* Post list */}
-      <main>
-        {/* Column headers */}
-        <div className="grid grid-cols-[100px_1fr_auto] md:grid-cols-[120px_1fr_auto] gap-4 font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-text-secondary mb-4 pb-2 border-b border-border">
-          <span>/ Date</span>
-          <span>/ Name</span>
-          <span className="hidden md:block w-4" />
+      </label>
+      {topics.length > 0 && (
+        <div className="topic-tabs">
+          <button aria-pressed={!topic} onClick={() => setTopic("")}>
+            all pages
+          </button>
+          {topics.map((t) => (
+            <button
+              key={t.name}
+              aria-pressed={topic === t.name}
+              onClick={() => setTopic(t.name)}
+            >
+              {t.name}
+            </button>
+          ))}
         </div>
-
-        {/* Posts */}
-        {filteredPosts.length === 0 ? (
-          <p className="py-8 text-center font-mono text-sm text-text-secondary">
-            No posts found for the selected filters.
-          </p>
-        ) : (
-          <FadeInStagger staggerDelay={0.05}>
-            <div className="space-y-0">
-              {filteredPosts.map((post) => (
-                <FadeInStaggerItem key={post.slug}>
-                  <PostListItem
-                    slug={post.slug}
-                    title={post.frontmatter.title}
-                    date={post.frontmatter.date}
-                  />
-                </FadeInStaggerItem>
-              ))}
-            </div>
-          </FadeInStagger>
-        )}
-
-        {/* Mobile filters */}
-        <div className="md:hidden mt-8 pt-8 border-t border-border">
-          <TopicFilter
-            topics={topics}
-            selectedTopics={selectedTopics}
-            onTopicChange={setSelectedTopics}
-            totalPosts={posts.length}
-          />
-        </div>
-      </main>
-    </div>
+      )}
+      {filtered.map((p, i) => (
+        <Link className="entry-row" href={`/blog/${p.slug}`} key={p.slug}>
+          <span className="entry-number">{String(i + 1).padStart(2, "0")}</span>
+          <div>
+            <h2>{p.frontmatter.title}</h2>
+            <p>{p.frontmatter.excerpt}</p>
+            <span className="entry-date">
+              {formatDate(p.frontmatter.date)} · {p.frontmatter.readingTime} min
+              read
+            </span>
+          </div>
+          <span aria-hidden="true">↗</span>
+        </Link>
+      ))}
+      {!filtered.length && (
+        <p className="empty-note">
+          No pages here yet
+          {query || topic ? ". Try another search or topic." : "."}
+        </p>
+      )}
+    </section>
   );
 }

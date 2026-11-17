@@ -181,6 +181,7 @@ async function getDbPublishedPosts(): Promise<Post[]> {
         },
         content,
         slug: row.slug,
+        document: row.tiptapJson,
       };
     });
   } catch (error) {
@@ -237,6 +238,7 @@ async function getDbPostBySlug(slug: string): Promise<Post | null> {
       },
       content,
       slug: row.slug,
+      document: row.tiptapJson,
     };
   } catch (error) {
     console.error("Error fetching post from database:", error);

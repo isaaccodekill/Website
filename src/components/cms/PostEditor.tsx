@@ -1,12 +1,8 @@
 "use client";
-
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Editor } from "./Editor";
-import { MetadataPanel } from "./MetadataPanel";
-import { useToast } from "@/components/ui/Toast";
-
+import { RichText, textOf } from "@/components/journal/RichText";
 interface Post {
   id: string;
   title: string;
@@ -19,273 +15,413 @@ interface Post {
   updatedAt: Date | string;
   publishedAt: Date | string | null;
 }
-
-interface PostEditorProps {
-  post: Post;
-}
-
-export function PostEditor({ post: initialPost }: PostEditorProps) {
+const prompts = [
+  "What’s taking up space in my mind?",
+  "What am I feeling, before I try to explain it?",
+  "What do I know — and what am I assuming?",
+  "What would I tell a friend in this situation?",
+  "What am I beginning to understand?",
+];
+export function PostEditor({ post: initial }: { post: Post }) {
   const router = useRouter();
-  const { toast } = useToast();
-  const [post, setPost] = useState(initialPost);
-  const [content, setContent] = useState(() => {
-    if (!initialPost.tiptapJson) return "{}";
-    if (typeof initialPost.tiptapJson === "string") return initialPost.tiptapJson;
-    return JSON.stringify(initialPost.tiptapJson);
-  });
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [isMetadataOpen, setIsMetadataOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Autosave
-  const save = useCallback(async () => {
-    if (isSaving) return;
-
-    setIsSaving(true);
-    try {
-      const response = await fetch(`/api/posts/${post.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: post.title,
-          slug: post.slug,
-          excerpt: post.excerpt,
-          topics: post.topics,
-          status: post.status,
-          tiptap_json: content,
-        }),
-      });
-
-      if (response.ok) {
-        setLastSaved(new Date());
-        setHasUnsavedChanges(false);
+  const [post, setPost] = useState(initial);
+  const [content, setContent] = useState(() =>
+    typeof initial.tiptapJson === "string"
+      ? initial.tiptapJson
+      : JSON.stringify(
+          initial.tiptapJson || {
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          },
+        ),
+  );
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const [focus, setFocus] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [details, setDetails] = useState(false);
+  const [review, setReview] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [prompt, setPrompt] = useState(-1);
+  const current = useRef({ post, content });
+  const version = useRef(0);
+  const savedVersion = useRef(0);
+  const queue = useRef<Promise<boolean> | null>(null);
+  const payload = () => {
+    const { post, content } = current.current;
+    return {
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      topics: post.topics,
+      tiptap_json: content,
+    };
+  };
+  const changed = () => {
+    version.current++;
+    setDirty(true);
+    setError("");
+  };
+  function field<K extends keyof Post>(key: K, value: Post[K]) {
+    current.current.post = { ...current.current.post, [key]: value };
+    setPost(current.current.post);
+    changed();
+  }
+  const save = useCallback(async (): Promise<boolean> => {
+    if (current.current.post.status === "published") return false;
+    if (queue.current) {
+      const ok = await queue.current;
+      if (!ok) return false;
+    }
+    if (savedVersion.current === version.current) return true;
+    const task = (async () => {
+      setSaving(true);
+      setError("");
+      try {
+        while (savedVersion.current !== version.current) {
+          const snapshot = version.current;
+          const r = await fetch(`/api/posts/${current.current.post.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload()),
+          });
+          if (!r.ok)
+            throw Error(
+              r.status === 401
+                ? "Your session ended. Keep this tab open and sign in again in another tab."
+                : "Couldn’t save. Your words are still here — check your connection and retry.",
+            );
+          savedVersion.current = snapshot;
+        }
+        setDirty(false);
+        setSaved(
+          new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        );
+        return true;
+      } catch (e) {
+        setError((e as Error).message);
+        return false;
+      } finally {
+        setSaving(false);
       }
-    } catch (error) {
-      console.error("Error saving post:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [post, content, isSaving]);
-
-  // Debounced autosave
+    })();
+    queue.current = task;
+    const result = await task;
+    queue.current = null;
+    return result;
+  }, []);
   useEffect(() => {
-    if (!hasUnsavedChanges) return;
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(() => {
-      save();
-    }, 3000); // Save after 3 seconds of inactivity
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    if (!dirty || post.status !== "draft" || error) return;
+    const timer = setTimeout(() => void save(), 1500);
+    return () => clearTimeout(timer);
+  }, [dirty, post, content, error, save]);
+  useEffect(() => {
+    const leave = (e: BeforeUnloadEvent) => {
+      if (version.current !== savedVersion.current) {
+        e.preventDefault();
+        e.returnValue = "";
       }
     };
-  }, [hasUnsavedChanges, save]);
-
-  // Mark as changed
-  const handleContentChange = useCallback((newContent: string) => {
-    setContent(newContent);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const handleMetadataChange = useCallback(
-    (field: string, value: any) => {
-      setPost((prev) => ({ ...prev, [field]: value }));
-      setHasUnsavedChanges(true);
-    },
-    []
-  );
-
-  // Publish
-  const publish = useCallback(async () => {
-    // Validate
-    if (!post.title.trim()) {
-      toast("Please add a title before publishing", "error");
-      setIsMetadataOpen(true);
-      return;
-    }
-
-    if (!post.slug.trim()) {
-      toast("Please add a slug before publishing", "error");
-      setIsMetadataOpen(true);
-      return;
-    }
-
-    setIsPublishing(true);
-    try {
-      // First save
-      await save();
-
-      // Then publish
-      const response = await fetch(`/api/posts/${post.id}/publish`, {
-        method: "POST",
-      });
-
-      if (response.ok) {
-        setPost((prev) => ({ ...prev, status: "published" }));
-        toast("Post published successfully!", "success");
-        router.refresh();
-      } else {
-        const error = await response.json();
-        toast(`Failed to publish: ${error.error}`, "error");
-      }
-    } catch (error) {
-      console.error("Error publishing:", error);
-      toast("Failed to publish post", "error");
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [post, save, router, toast]);
-
-  // Delete
-  const deletePost = useCallback(async () => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
-
-    try {
-      const response = await fetch(`/api/posts/${post.id}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        toast("Post deleted", "info");
-        router.push("/cms/posts");
-      } else {
-        toast("Failed to delete post", "error");
-      }
-    } catch (error) {
-      console.error("Error deleting:", error);
-      toast("Failed to delete post", "error");
-    }
-  }, [post.id, router, toast]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const key = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        save();
+        if (current.current.post.status === "draft") void save();
+        else {
+          setReview(true);
+          setPreview(true);
+        }
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        publish();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "m") {
-        e.preventDefault();
-        setIsMetadataOpen((prev) => !prev);
+      if (e.key === "Escape") {
+        setFocus(false);
+        setReview(false);
       }
     };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [save, publish]);
-
+    window.addEventListener("beforeunload", leave);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("beforeunload", leave);
+      window.removeEventListener("keydown", key);
+    };
+  }, [save]);
+  async function back() {
+    if (post.status === "draft") {
+      if (!(await save())) return;
+    } else if (
+      dirty &&
+      !window.confirm("Leave without publishing these changes?")
+    )
+      return;
+    router.push("/cms/posts");
+  }
+  useEffect(() => {
+    const navigate = async (e: MouseEvent) => {
+      if (
+        !dirty ||
+        e.defaultPrevented ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey ||
+        e.button !== 0
+      )
+        return;
+      const a = (e.target as Element).closest("a");
+      if (!a || a.target === "_blank" || a.origin !== location.origin) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (current.current.post.status === "draft") {
+        if (!(await save())) return;
+      } else if (!window.confirm("Leave without publishing these changes?"))
+        return;
+      router.push(a.pathname + a.search + a.hash);
+    };
+    document.addEventListener("click", navigate, true);
+    return () => document.removeEventListener("click", navigate, true);
+  }, [dirty, save, router]);
+  async function publish() {
+    setPublishing(true);
+    setError("");
+    try {
+      if (queue.current && !(await queue.current)) return;
+      const r = await fetch(`/api/posts/${post.id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload(), confirmPublish: true }),
+      });
+      const data = await r.json();
+      if (!r.ok)
+        throw Error(data.error || "Couldn’t publish. Your page is still here.");
+      current.current.post = { ...current.current.post, status: "published" };
+      setPost(current.current.post);
+      savedVersion.current = version.current;
+      setDirty(false);
+      setReview(false);
+      setSaved("Published");
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPublishing(false);
+    }
+  }
+  function download() {
+    const blob = new Blob([post.title + "\n\n" + textOf(JSON.parse(content))], {
+      type: "text/plain",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (post.slug || "my-page") + ".txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  const words = textOf(JSON.parse(content))
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
   return (
-    <div className="min-h-screen bg-bg">
-      {/* Editor header */}
-      <div className="sticky top-[57px] z-30 bg-bg border-b border-border">
-        <div className="mx-auto max-w-4xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/cms/posts"
-              className="font-mono text-xs text-text-tertiary hover:text-accent transition-colors"
-            >
-              &larr; Back
-            </Link>
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  hasUnsavedChanges ? "bg-amber-400" : "bg-green-400"
-                }`}
-              />
-              <span className="font-mono text-[0.625rem] text-text-tertiary uppercase tracking-wider">
-                {isSaving
-                  ? "Saving..."
-                  : hasUnsavedChanges
-                    ? "Unsaved"
-                    : lastSaved
-                      ? `Saved ${lastSaved.toLocaleTimeString()}`
-                      : "Saved"}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsMetadataOpen(true)}
-              className="px-3 py-1.5 border border-border rounded font-mono text-xs text-text-secondary hover:text-accent hover:border-accent transition-colors"
-            >
-              Metadata
-            </button>
-            <button
-              onClick={save}
-              disabled={isSaving}
-              className="px-3 py-1.5 border border-border rounded font-mono text-xs text-text-secondary hover:text-accent hover:border-accent transition-colors disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button
-              onClick={publish}
-              disabled={isPublishing}
-              className="px-3 py-1.5 bg-accent text-white rounded font-mono text-xs hover:bg-accent-hover transition-colors disabled:opacity-50"
-            >
-              {isPublishing ? "Publishing..." : "Publish"}
-            </button>
-            <button
-              onClick={deletePost}
-              className="px-3 py-1.5 border border-red-300 text-red-600 rounded font-mono text-xs hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
-          </div>
+    <div className={`writing-desk ${focus ? "focus-mode" : ""}`}>
+      <div className="editor-toolbar">
+        <button onClick={back}>← notebook</button>
+        <span className="save-state" role="status" aria-live="polite">
+          {saving
+            ? "Saving…"
+            : error
+              ? "Not saved"
+              : dirty
+                ? post.status === "draft"
+                  ? "Waiting to save…"
+                  : "Unpublished changes"
+                : post.status === "draft"
+                  ? `Private · ${saved ? "saved " + saved : "saved"}`
+                  : "Published"}
+        </span>
+        <div className="editor-actions">
+          <button aria-pressed={focus} onClick={() => setFocus(!focus)}>
+            {focus ? "Exit focus" : "Focus"}
+          </button>
+          <button aria-pressed={preview} onClick={() => setPreview(!preview)}>
+            {preview ? "Write" : "Read"}
+          </button>
+          <button onClick={() => setDetails(!details)} aria-expanded={details}>
+            Details
+          </button>
+          <button
+            className="ink-button"
+            disabled={saving || publishing}
+            onClick={() => {
+              setReview(true);
+              setPreview(true);
+              setFocus(false);
+            }}
+          >
+            Review & {post.status === "published" ? "update" : "publish"}
+          </button>
         </div>
       </div>
-
-      {/* Title input */}
-      <div className="mx-auto max-w-3xl px-6 pt-8">
-        <input
-          type="text"
-          value={post.title}
-          onChange={(e) => handleMetadataChange("title", e.target.value)}
-          placeholder="Post title..."
-          className="w-full font-serif text-3xl font-semibold text-text bg-transparent border-none focus:outline-none placeholder:text-text-tertiary"
-        />
-      </div>
-
-      {/* Editor */}
-      <div className="mx-auto max-w-3xl">
-        <Editor content={content} onChange={handleContentChange} onSave={save} />
-      </div>
-
-      {/* Metadata panel */}
-      <MetadataPanel
-        isOpen={isMetadataOpen}
-        onClose={() => setIsMetadataOpen(false)}
-        title={post.title}
-        onTitleChange={(v) => handleMetadataChange("title", v)}
-        slug={post.slug}
-        onSlugChange={(v) => handleMetadataChange("slug", v)}
-        excerpt={post.excerpt}
-        onExcerptChange={(v) => handleMetadataChange("excerpt", v)}
-        topics={post.topics}
-        onTopicsChange={(v) => handleMetadataChange("topics", v)}
-        status={post.status}
-        onStatusChange={(v) => handleMetadataChange("status", v)}
-      />
-
-      {/* Keyboard shortcuts hint */}
-      <div className="fixed bottom-4 right-4 font-mono text-[0.625rem] text-text-tertiary space-x-4">
-        <span>⌘S Save</span>
-        <span>⌘M Metadata</span>
-        <span>⌘↵ Publish</span>
-      </div>
+      {error && (
+        <div className="save-error" role="alert">
+          {error} <button onClick={() => void save()}>Retry save</button>{" "}
+          <button onClick={download}>Download a text copy</button>
+        </div>
+      )}
+      {post.status === "published" && dirty && (
+        <p className="editor-notice">
+          Changes to this published page stay in this tab until you review and
+          publish them. Download a copy before leaving.
+        </p>
+      )}
+      <fieldset className="writing-page" disabled={publishing}>
+        <p className="eyebrow">
+          {preview
+            ? "Reading preview · only you can see this"
+            : post.status === "draft"
+              ? "A private page. No need to make it perfect."
+              : "A page you’ve shared"}
+        </p>
+        {preview ? (
+          <h1>{post.title || "Untitled"}</h1>
+        ) : (
+          <input
+            className="writing-title"
+            aria-label="Page title"
+            placeholder="Give this a name, if you like…"
+            value={post.title}
+            disabled={publishing}
+            onChange={(e) => field("title", e.target.value)}
+          />
+        )}
+        {!preview && words === 0 && (
+          <div className="reflection-prompt">
+            <button onClick={() => setPrompt((p) => (p + 1) % prompts.length)}>
+              ✳ {prompt < 0 ? "Need a place to begin?" : "Another question"}
+            </button>
+            {prompt >= 0 && <p>{prompts[prompt]}</p>}
+          </div>
+        )}
+        <div hidden={preview || publishing}>
+          <Editor
+            content={content}
+            onChange={(value) => {
+              current.current.content = value;
+              setContent(value);
+              changed();
+            }}
+          />
+        </div>
+        {(preview || publishing) && (
+          <div className="prose reading-prose">
+            <RichText document={content} />
+          </div>
+        )}
+        <div className="page-footnote">
+          <span>
+            {words} {words === 1 ? "word" : "words"} ·{" "}
+            {Math.max(1, Math.ceil(words / 200))} min read
+          </span>
+          <span>
+            {preview
+              ? "The same type and spacing your readers see"
+              : "Select text to format · / for more · ⌘/Ctrl S to save"}
+          </span>
+        </div>
+        {details && (
+          <section className="page-details">
+            <h2>A few details</h2>
+            <label>
+              Page address
+              <input
+                value={post.slug}
+                onChange={(e) => field("slug", e.target.value)}
+              />
+            </label>
+            <button
+              onClick={() =>
+                field(
+                  "slug",
+                  post.title
+                    .toLowerCase()
+                    .normalize("NFKD")
+                    .replace(/[^a-z0-9\s-]/g, "")
+                    .trim()
+                    .replace(/[\s-]+/g, "-"),
+                )
+              }
+            >
+              Make from title
+            </button>
+            <label>
+              A small introduction
+              <textarea
+                value={post.excerpt}
+                onChange={(e) => field("excerpt", e.target.value)}
+                placeholder="Optional. A sentence to welcome someone in."
+              />
+            </label>
+            <label>
+              Topics, separated by commas
+              <input
+                value={post.topics.join(", ")}
+                onChange={(e) =>
+                  field(
+                    "topics",
+                    e.target.value.split(",").map((x) => x.trim()),
+                  )
+                }
+              />
+            </label>
+            <button onClick={download}>Download a text copy ↗</button>
+          </section>
+        )}
+        {review && (
+          <section className="publish-review" aria-label="Review publication">
+            <p className="eyebrow">A deliberate little step</p>
+            <h2>
+              {post.status === "draft"
+                ? "Ready to open this page?"
+                : "Ready to share these changes?"}
+            </h2>
+            <p>
+              {post.status === "draft"
+                ? "Publishing makes this piece readable by anyone. Your other drafts stay private."
+                : "This replaces the version people can currently read."}
+            </p>
+            <label>
+              Title
+              <input
+                value={post.title}
+                onChange={(e) => field("title", e.target.value)}
+                disabled={publishing}
+              />
+            </label>
+            <label>
+              Page address
+              <input
+                value={post.slug}
+                onChange={(e) => field("slug", e.target.value)}
+                disabled={publishing}
+              />
+            </label>
+            <div>
+              <button
+                className="ink-button"
+                onClick={publish}
+                disabled={publishing || !post.title.trim() || !post.slug.trim()}
+              >
+                {publishing ? "Publishing…" : "Yes, publish this page"}
+              </button>
+              <button onClick={() => setReview(false)} disabled={publishing}>
+                Keep thinking
+              </button>
+            </div>
+          </section>
+        )}
+      </fieldset>
     </div>
   );
 }
