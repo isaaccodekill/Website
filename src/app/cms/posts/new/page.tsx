@@ -1,22 +1,39 @@
-import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { posts } from "@/lib/schema";
-import { v4 as uuidv4 } from "uuid";
-
-export default async function NewPostPage() {
-  // Create a new post and redirect to the editor
-  const id = uuidv4();
-  const slug = `untitled-${id.slice(0, 8)}`;
-
-  await db.insert(posts).values({
-    id,
-    title: "",
-    slug,
-    excerpt: "",
-    topics: [],
-    status: "draft",
-    tiptapJson: {},
-  });
-
-  redirect(`/cms/posts/${id}`);
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+export default function NewPost() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  async function create() {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!r.ok)
+        throw Error("Couldn’t open a page. Please sign in and try again.");
+      const p = await r.json();
+      router.replace(`/cms/posts/${p.id}`);
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="studio-welcome">
+      <p className="eyebrow">No need to have it figured out</p>
+      <h1>Start anywhere.</h1>
+      <p>
+        A sentence, a question, a feeling. This page will be a private draft.
+      </p>
+      <button className="ink-button" disabled={busy} onClick={create}>
+        {busy ? "Opening your page…" : "Open a blank page →"}
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
 }

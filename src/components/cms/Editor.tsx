@@ -13,16 +13,13 @@ import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { common, createLowlight } from "lowlight";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  SlashCommandMenu,
-  type SlashCommandItem,
-} from "./SlashCommandMenu";
+import { SlashCommandMenu, type SlashCommandItem } from "./SlashCommandMenu";
 
 const lowlight = createLowlight(common);
 
 // --- Slash Command Items ---
 function getSlashCommandItems(
-  fileInputRef: React.RefObject<HTMLInputElement | null>
+  fileInputRef: React.RefObject<HTMLInputElement | null>,
 ): SlashCommandItem[] {
   return [
     {
@@ -56,12 +53,7 @@ function getSlashCommandItems(
       description: "Unordered list of items",
       icon: "\u2022",
       command: ({ editor, range }) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .toggleBulletList()
-          .run();
+        editor.chain().focus().deleteRange(range).toggleBulletList().run();
       },
     },
     {
@@ -69,12 +61,7 @@ function getSlashCommandItems(
       description: "Ordered list of items",
       icon: "1.",
       command: ({ editor, range }) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .toggleOrderedList()
-          .run();
+        editor.chain().focus().deleteRange(range).toggleOrderedList().run();
       },
     },
     {
@@ -82,12 +69,7 @@ function getSlashCommandItems(
       description: "Highlight a quote",
       icon: "\u201C",
       command: ({ editor, range }) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .toggleBlockquote()
-          .run();
+        editor.chain().focus().deleteRange(range).toggleBlockquote().run();
       },
     },
     {
@@ -95,12 +77,7 @@ function getSlashCommandItems(
       description: "Syntax-highlighted code",
       icon: "{ }",
       command: ({ editor, range }) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .toggleCodeBlock()
-          .run();
+        editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
       },
     },
     {
@@ -117,12 +94,7 @@ function getSlashCommandItems(
       description: "Visual section divider",
       icon: "\u2014",
       command: ({ editor, range }) => {
-        editor
-          .chain()
-          .focus()
-          .deleteRange(range)
-          .setHorizontalRule()
-          .run();
+        editor.chain().focus().deleteRange(range).setHorizontalRule().run();
       },
     },
   ];
@@ -130,7 +102,7 @@ function getSlashCommandItems(
 
 // --- Slash Command Extension ---
 function createSlashCommandExtension(
-  fileInputRef: React.RefObject<HTMLInputElement | null>
+  fileInputRef: React.RefObject<HTMLInputElement | null>,
 ) {
   const allItems = getSlashCommandItems(fileInputRef);
 
@@ -144,7 +116,7 @@ function createSlashCommandExtension(
           startOfLine: false,
           items: ({ query }: { query: string }) => {
             return allItems.filter((item) =>
-              item.title.toLowerCase().includes(query.toLowerCase())
+              item.title.toLowerCase().includes(query.toLowerCase()),
             );
           },
           render: () => {
@@ -171,7 +143,7 @@ function createSlashCommandExtension(
                         range: props.range,
                       });
                     }}
-                  />
+                  />,
                 );
 
                 const { view } = props.editor;
@@ -197,7 +169,7 @@ function createSlashCommandExtension(
                         range: props.range,
                       });
                     }}
-                  />
+                  />,
                 );
 
                 const { view } = props.editor;
@@ -261,9 +233,10 @@ interface EditorProps {
   onSave?: () => void;
 }
 
-export function Editor({ content, onChange, onSave }: EditorProps) {
+export function Editor({ content, onChange }: EditorProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
@@ -271,12 +244,13 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
     extensions: [
       StarterKit.configure({
         codeBlock: false,
+        link: false,
         heading: {
           levels: [2, 3],
         },
       }),
       Placeholder.configure({
-        placeholder: "Start writing, or type / for commands...",
+        placeholder: "What’s on your mind?",
         emptyEditorClass: "is-editor-empty",
       }),
       Link.configure({
@@ -303,11 +277,17 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
       }),
       createSlashCommandExtension(fileInputRef),
     ],
-    content: content ? JSON.parse(content) : undefined,
+    content:
+      content && JSON.parse(content)?.type === "doc"
+        ? JSON.parse(content)
+        : undefined,
     editorProps: {
       attributes: {
+        "aria-label": "Your writing",
+        role: "textbox",
+        "aria-multiline": "true",
         class:
-          "prose prose-lg max-w-none focus:outline-none min-h-[70vh] px-4 py-8 editor-sans",
+          "prose reading-prose max-w-none focus:outline-none min-h-[50vh] py-8",
       },
       handleDrop: (view, event, _slice, moved) => {
         if (moved || !event.dataTransfer?.files.length) return false;
@@ -327,11 +307,16 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
           .then((url) => {
             const { schema } = view.state;
             const node = schema.nodes.image.create({ src: url });
-            const tr = view.state.tr.insert(pos?.pos ?? view.state.doc.content.size, node);
+            const tr = view.state.tr.insert(
+              pos?.pos ?? view.state.doc.content.size,
+              node,
+            );
             view.dispatch(tr);
           })
           .catch((err) => {
-            console.error("Image upload failed:", err);
+            setUploadError(
+              err instanceof Error ? err.message : "Image could not be added.",
+            );
           })
           .finally(() => {
             setIsUploading(false);
@@ -358,7 +343,11 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
                 view.dispatch(tr);
               })
               .catch((err) => {
-                console.error("Image paste upload failed:", err);
+                setUploadError(
+                  err instanceof Error
+                    ? err.message
+                    : "Image could not be added.",
+                );
               })
               .finally(() => {
                 setIsUploading(false);
@@ -381,19 +370,6 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
     setIsMounted(true);
   }, []);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        onSave?.();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onSave]);
-
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -406,14 +382,14 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
       } catch (err) {
         console.error(
           "Image upload failed:",
-          err instanceof Error ? err.message : "Unknown error"
+          err instanceof Error ? err.message : "Unknown error",
         );
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [editor]
+    [editor],
   );
 
   const setLink = useCallback(() => {
@@ -452,6 +428,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
         onChange={handleFileChange}
       />
 
+      {uploadError && <p role="alert">{uploadError}</p>}
       {/* Upload indicator */}
       {isUploading && (
         <div className="fixed bottom-6 right-6 z-50 bg-bg border border-border rounded-lg px-4 py-2 shadow-lg font-mono text-xs text-text-secondary">
@@ -463,10 +440,19 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
       {editor && (
         <BubbleMenu
           editor={editor}
-          shouldShow={({ editor: bubbleEditor, state }: { editor: any; state: any }) => {
+          shouldShow={({
+            editor: bubbleEditor,
+            state,
+          }: {
+            editor: any;
+            state: any;
+          }) => {
             const { from, to } = state.selection;
             if (from === to) return false;
-            if (bubbleEditor.isActive("codeBlock") || bubbleEditor.isActive("image"))
+            if (
+              bubbleEditor.isActive("codeBlock") ||
+              bubbleEditor.isActive("image")
+            )
               return false;
             return true;
           }}
@@ -474,6 +460,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
           <div className="bubble-menu">
             <button
               type="button"
+              aria-label="Bold"
               onClick={() => editor.chain().focus().toggleBold().run()}
               className={`bubble-menu-btn ${editor.isActive("bold") ? "is-active" : ""}`}
             >
@@ -481,6 +468,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
             </button>
             <button
               type="button"
+              aria-label="Italic"
               onClick={() => editor.chain().focus().toggleItalic().run()}
               className={`bubble-menu-btn ${editor.isActive("italic") ? "is-active" : ""}`}
             >
@@ -488,6 +476,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
             </button>
             <button
               type="button"
+              aria-label="Strikethrough"
               onClick={() => editor.chain().focus().toggleStrike().run()}
               className={`bubble-menu-btn ${editor.isActive("strike") ? "is-active" : ""}`}
             >
@@ -495,6 +484,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
             </button>
             <button
               type="button"
+              aria-label="Code"
               onClick={() => editor.chain().focus().toggleCode().run()}
               className={`bubble-menu-btn ${editor.isActive("code") ? "is-active" : ""}`}
             >
@@ -502,6 +492,7 @@ export function Editor({ content, onChange, onSave }: EditorProps) {
             </button>
             <button
               type="button"
+              aria-label="Highlight"
               onClick={() => editor.chain().focus().toggleHighlight().run()}
               className={`bubble-menu-btn ${editor.isActive("highlight") ? "is-active" : ""}`}
             >

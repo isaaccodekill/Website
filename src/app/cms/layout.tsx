@@ -1,59 +1,39 @@
 import Link from "next/link";
 import { ToastProvider } from "@/components/ui/Toast";
-
-export default function CMSLayout({
+import { signOut } from "@/auth";
+import { isOwner } from "@/lib/studio-auth";
+export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false } };
+export default async function CMSLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const owner = await isOwner();
   return (
-    <div className="min-h-screen bg-bg">
-      {/* CMS Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-bg/95 backdrop-blur-sm">
-        <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link
-              href="/cms"
-              className="font-mono text-[0.6875rem] font-semibold tracking-[0.12em] uppercase text-text hover:text-accent transition-colors"
-            >
-              Writing Studio
-            </Link>
-            <nav className="flex items-center gap-4">
-              <Link
-                href="/cms/posts"
-                className="font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors"
+    <div className="studio">
+      <header className="studio-nav">
+        <Link className="signature" href="/cms">
+          my notebook <span aria-hidden="true">✳</span>
+        </Link>
+        <nav aria-label="Notebook navigation">
+          {owner && (
+            <>
+              <Link href="/cms/posts">all pages</Link>
+              <form
+                action={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/cms/login" });
+                }}
               >
-                Posts
-              </Link>
-              <Link
-                href="/cms/media"
-                className="font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors"
-              >
-                Media
-              </Link>
-              <Link
-                href="/cms/home"
-                className="font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-text-secondary hover:text-accent transition-colors"
-              >
-                Home
-              </Link>
-            </nav>
-          </div>
-
-          <Link
-            href="/"
-            target="_blank"
-            className="font-mono text-[0.6875rem] tracking-[0.08em] uppercase text-text-tertiary hover:text-accent transition-colors"
-          >
-            View Site &rarr;
-          </Link>
-        </div>
+                <button>sign out</button>
+              </form>
+            </>
+          )}
+          <Link href="/">visit site ↗</Link>
+        </nav>
       </header>
-
-      {/* Main content */}
-      <ToastProvider>
-        <main>{children}</main>
-      </ToastProvider>
+      <ToastProvider>{children}</ToastProvider>
     </div>
   );
 }

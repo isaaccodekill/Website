@@ -1,3 +1,4 @@
+import { requireOwner } from "@/lib/studio-auth";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -12,6 +13,7 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
+  await requireOwner();
   const { id } = await params;
 
   const rows = await db
@@ -59,6 +61,7 @@ async function getPost(id: string) {
 }
 
 export default async function EditPostPage({ params }: PageProps) {
+  await requireOwner();
   const { id } = await params;
   const post = await getPost(id);
 

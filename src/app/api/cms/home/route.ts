@@ -1,7 +1,12 @@
+import { revalidatePath } from "next/cache";
+import { studioApiGuard } from "@/lib/studio-auth";
 import { NextResponse } from "next/server";
 import { updateHomePageSections, HomeSection } from "@/lib/site-content";
 
 export async function POST(request: Request) {
+  const denied = await studioApiGuard(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
 
@@ -14,7 +19,7 @@ export async function POST(request: Request) {
         if (!section.id || typeof section.text !== "string") {
           return NextResponse.json(
             { error: "Invalid section format" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -22,24 +27,25 @@ export async function POST(request: Request) {
       const success = await updateHomePageSections(sections);
 
       if (success) {
+        revalidatePath("/about");
         return NextResponse.json({ message: "Content saved successfully" });
       } else {
         return NextResponse.json(
           { error: "Failed to save content" },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
 
     return NextResponse.json(
       { error: "Invalid request format" },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (error) {
     console.error("Error saving home content:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

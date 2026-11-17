@@ -1,3 +1,5 @@
+import { RichText } from "@/components/journal/RichText";
+export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { compileMDX } from "next-mdx-remote/rsc";
@@ -6,7 +8,7 @@ import { PostArticle } from "@/components/blog/PostArticle";
 import { Callout } from "@/components/blog/mdx/Callout";
 import { BlockQuote } from "@/components/blog/mdx/BlockQuote";
 import { ImageWithCaption } from "@/components/blog/mdx/ImageWithCaption";
-import { Butterflies } from "@/components/effects/Butterflies";
+
 
 // Custom components for MDX
 const components = {
@@ -129,7 +131,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound();
   }
 
-  const { content } = await compileMDX({
+  const { content } = post.document ? {content: <RichText document={post.document}/>} : await compileMDX({
     source: post.content,
     components,
     options: {
@@ -172,7 +174,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Butterflies />
+
       <PostArticle frontmatter={post.frontmatter}>{content}</PostArticle>
     </>
   );

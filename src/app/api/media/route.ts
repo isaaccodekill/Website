@@ -1,3 +1,4 @@
+import { studioApiGuard } from "@/lib/studio-auth";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { mediaEntries } from "@/lib/schema";
@@ -7,6 +8,8 @@ import { getWeekBounds, Track, MediaItem } from "@/lib/media";
 
 // GET /api/media - List all media entries
 export async function GET() {
+  const denied = await studioApiGuard(); if (denied) return denied;
+
   try {
     const rows = await db
       .select()
@@ -36,6 +39,8 @@ export async function GET() {
 
 // POST /api/media - Create a new media entry
 export async function POST(request: Request) {
+  const denied = await studioApiGuard(request); if (denied) return denied;
+
   try {
     const body = await request.json();
     const id = uuidv4();

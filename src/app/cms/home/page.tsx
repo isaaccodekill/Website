@@ -1,13 +1,15 @@
+import { requireOwner } from "@/lib/studio-auth";
 import { Metadata } from "next";
 import { getHomePageSections } from "@/lib/site-content";
 import { HomeContentEditor } from "@/components/cms/HomeContentEditor";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Edit Home Page — CMS",
+  title: "Edit About Page — CMS",
 };
 
 export default async function EditHomePage() {
+  await requireOwner();
   const sections = await getHomePageSections();
 
   return (
@@ -20,7 +22,7 @@ export default async function EditHomePage() {
           <span>&larr;</span> Back to Dashboard
         </Link>
         <h1 className="font-serif text-3xl font-semibold text-text mb-2">
-          Edit Home Page
+          Edit About Page
         </h1>
         <p className="font-mono text-xs text-text-secondary uppercase tracking-wider">
           / Customize sections, text, and illustrations
